@@ -34,8 +34,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Andriichuk\\AtomParkSmsChannel\\": "src/",
-            "Andriichuk\\AtomParkSmsChannel\\Database\\Factories\\": "database/factories/"
+            "Andriichuk\\AtomParkSmsChannel\\": "src/"
         }
     },
     "autoload-dev": {

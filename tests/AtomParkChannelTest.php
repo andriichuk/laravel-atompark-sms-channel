@@ -48,10 +48,7 @@ it('sends sms via AtomParkChannel for notifiable model', function () {
 
         public function toAtomPark($notifiable): Sms
         {
-            return new Sms(
-                text: 'Test message',
-                phone: $notifiable->routeNotificationForAtomPark(),
-            );
+            return new Sms(text: 'Test message');
         }
     };
 
@@ -86,15 +83,84 @@ it('sends sms for anonymous notifiable route', function () {
 
             public function toAtomPark($notifiable): Sms
             {
-                $phone = method_exists($notifiable, 'routeNotificationFor')
-                    ? $notifiable->routeNotificationFor('atompark')
-                    : (string) $notifiable;
-
-                return new Sms(
-                    text: 'Anonymous message',
-                    phone: $phone,
-                );
+                return new Sms(text: 'Anonymous message');
             }
         });
-}
-);
+});
+
+it('throws when notification does not implement toAtomPark', function () {
+    $channel = new AtomParkChannel($this->createMock(AtomParkClient::class));
+
+    $notifiable = new class extends Model
+    {
+        use Notifiable;
+    };
+
+    $notification = new class extends Notification
+    {
+        public function via($notifiable): array
+        {
+            return ['atompark'];
+        }
+    };
+
+    $channel->send($notifiable, $notification);
+})->throws(InvalidArgumentException::class, 'Notification must implement toAtomPark() method.');
+
+it('throws when toAtomPark does not return Sms instance', function () {
+    $channel = new AtomParkChannel($this->createMock(AtomParkClient::class));
+
+    $notifiable = new class extends Model
+    {
+        use Notifiable;
+
+        public function routeNotificationForAtomPark(): string
+        {
+            return '+123456789';
+        }
+    };
+
+    $notification = new class extends Notification
+    {
+        public function via($notifiable): array
+        {
+            return ['atompark'];
+        }
+
+        public function toAtomPark($notifiable): string
+        {
+            return 'not an Sms instance';
+        }
+    };
+
+    $channel->send($notifiable, $notification);
+})->throws(InvalidArgumentException::class, 'Notification::toAtomPark() must return an instance of '.Sms::class.'.');
+
+it('throws when phone cannot be resolved from notifiable', function () {
+    $channel = new AtomParkChannel($this->createMock(AtomParkClient::class));
+
+    $notifiable = new class extends Model
+    {
+        use Notifiable;
+
+        public function routeNotificationForAtomPark(): string
+        {
+            return '';
+        }
+    };
+
+    $notification = new class extends Notification
+    {
+        public function via($notifiable): array
+        {
+            return ['atompark'];
+        }
+
+        public function toAtomPark($notifiable): Sms
+        {
+            return new Sms(text: 'Test');
+        }
+    };
+
+    $channel->send($notifiable, $notification);
+})->throws(InvalidArgumentException::class, 'Could not determine recipient phone number for AtomPark SMS notification.');

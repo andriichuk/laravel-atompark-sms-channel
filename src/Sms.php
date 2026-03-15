@@ -10,7 +10,7 @@ final readonly class Sms implements Arrayable
 {
     public function __construct(
         public string $text,
-        public string $phone,
+        public ?string $phone = null,
         public int $lifetime = 1, // (0 = maximum, 1, 6, 12, 24 hours)
     ) {}
 

@@ -10,21 +10,9 @@ This package makes it easy to send SMS notifications using [AtomPark](https://ww
 Sending an SMS to a user becomes as simple as using:
 
 ```php
-$user->notify(new YourNotification());
+$user->notify(new Invitation());
 ```
 
-### Contents
-
-- Installation
-  - Setting up the AtomPark service
-- Usage
-  - Sending text messages
-    - Available message methods
-- Testing
-- Changelog
-- Contributing
-- Security
-- License
 
 ## Installation
 
@@ -106,7 +94,6 @@ class Invitation extends Notification
     {
         return new Sms(
             text: 'You have been invited!',
-            phone: $notifiable->routeNotificationForAtomPark(),
             lifetime: 1, // 0 = maximum, 1/6/12/24 hours
         );
     }
@@ -130,28 +117,14 @@ Notification::route('atompark', '+380991112233')
     ->notify(new Invitation());
 ```
 
-Your `toAtomPark` method will receive an `AnonymousNotifiable` instance, and you can resolve the phone number using:
-
-```php
-public function toAtomPark($notifiable): Sms
-{
-    $phone = method_exists($notifiable, 'routeNotificationFor')
-        ? $notifiable->routeNotificationFor('atompark')
-        : (string) $notifiable;
-
-    return new Sms(
-        text: 'You have been invited!',
-        phone: $phone,
-    );
-}
-```
+The channel resolves the recipient phone from the notifiable (via `routeNotificationFor('atompark')` or the notifiable’s string form), so your `toAtomPark` method can stay the same and omit the `phone` argument.
 
 ### Available message options
 
 The `Sms` value object supports:
 
 - `text` (string) – the message body.
-- `phone` (string) – recipient phone number including country code.
+- `phone` (string, optional) – recipient phone number including country code; if omitted, the channel resolves it from the notifiable.
 - `lifetime` (int) – message lifetime in hours (`0` = maximum, `1`, `6`, `12`, `24`).
 
 ## Testing

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Andriichuk\AtomParkSmsChannel;
 
 use Illuminate\Notifications\Notification;
+use InvalidArgumentException;
 
 final readonly class AtomParkChannel
 {
@@ -12,18 +13,41 @@ final readonly class AtomParkChannel
         private AtomParkClient $atomParkClient,
     ) {}
 
-    public function send($notifiable, Notification $notification): void
+    public function send(object $notifiable, Notification $notification): void
     {
         if (! method_exists($notification, 'toAtomPark')) {
-            return;
+            throw new InvalidArgumentException(
+                'Notification must implement toAtomPark() method.'
+            );
         }
 
         $message = $notification->toAtomPark($notifiable);
 
         if (! $message instanceof Sms) {
-            return;
+            throw new InvalidArgumentException(
+                'Notification::toAtomPark() must return an instance of '.Sms::class.'.'
+            );
         }
 
-        $this->atomParkClient->sendSMS($message->toArray());
+        $data = $message->toArray();
+        
+        if (($data['phone'] ?? '') === '') {
+            $data['phone'] = $this->resolvePhone($notifiable);
+        }
+
+        if ($data['phone'] === '') {
+            throw new InvalidArgumentException(
+                'Could not determine recipient phone number for AtomPark SMS notification.'
+            );
+        }
+
+        $this->atomParkClient->sendSMS($data);
+    }
+
+    private function resolvePhone(object $notifiable): string
+    {
+        return method_exists($notifiable, 'routeNotificationFor')
+            ? (string) $notifiable->routeNotificationFor('atompark')
+            : (string) $notifiable;
     }
 }
