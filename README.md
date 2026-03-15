@@ -86,8 +86,7 @@ class Invitation extends Notification
 {
     public function via($notifiable): array
     {
-        return ['atompark'];
-        // or: return [AtomParkChannel::class];
+        return [AtomParkChannel::class];
     }
 
     public function toAtomPark($notifiable): Sms
@@ -113,11 +112,11 @@ You can also send SMS messages to phone numbers that are not associated with a n
 ```php
 use Illuminate\Support\Facades\Notification;
 
-Notification::route('atompark', '+380991112233')
+Notification::route(AtomParkChannel::class, '+380991112233')
     ->notify(new Invitation());
 ```
 
-The channel resolves the recipient phone from the notifiable (via `routeNotificationFor('atompark')` or the notifiable’s string form), so your `toAtomPark` method can stay the same and omit the `phone` argument.
+The channel resolves the recipient phone from the notifiable (via `routeNotificationFor(AtomParkChannel::class)` or the notifiable’s string form), so your `toAtomPark` method can stay the same and omit the `phone` argument.
 
 ### Available message options
 
