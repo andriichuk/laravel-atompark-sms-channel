@@ -30,7 +30,7 @@ final readonly class AtomParkChannel
         }
 
         $data = $message->toArray();
-        
+
         if (($data['phone'] ?? '') === '') {
             $data['phone'] = $this->resolvePhone($notifiable);
         }
