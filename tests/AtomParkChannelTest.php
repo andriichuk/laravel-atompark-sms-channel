@@ -55,6 +55,54 @@ it('sends sms via AtomParkChannel for notifiable model', function () {
     $channel->send($notifiable, $notification);
 });
 
+it('resolves phone using full channel class name', function () {
+    $client = $this->createMock(AtomParkClient::class);
+
+    $client->expects($this->once())
+        ->method('sendSMS')
+        ->with($this->callback(function (array $params): bool {
+            expect($params)->toMatchArray([
+                'text' => 'Class based message',
+                'phone' => '+987654321',
+                'sms_lifetime' => 1,
+            ]);
+
+            return true;
+        }))
+        ->willReturn($this->createMock(ResponseInterface::class));
+
+    $channel = new AtomParkChannel($client);
+
+    $notifiable = new class extends Model
+    {
+        use Notifiable;
+
+        public function routeNotificationFor($driver): ?string
+        {
+            return match ($driver) {
+                'atompark' => null,
+                AtomParkChannel::class => '+987654321',
+                default => null,
+            };
+        }
+    };
+
+    $notification = new class extends Notification
+    {
+        public function via($notifiable): array
+        {
+            return [AtomParkChannel::class];
+        }
+
+        public function toAtomPark($notifiable): Sms
+        {
+            return new Sms(text: 'Class based message');
+        }
+    };
+
+    $channel->send($notifiable, $notification);
+});
+
 it('sends sms for anonymous notifiable route', function () {
     $client = $this->createMock(AtomParkClient::class);
 

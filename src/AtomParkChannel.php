@@ -46,8 +46,16 @@ final readonly class AtomParkChannel
 
     private function resolvePhone(object $notifiable): string
     {
-        return method_exists($notifiable, 'routeNotificationFor')
-            ? (string) $notifiable->routeNotificationFor('atompark')
-            : (string) $notifiable;
+        if (! method_exists($notifiable, 'routeNotificationFor')) {
+            return (string) $notifiable;
+        }
+
+        $phone = $notifiable->routeNotificationFor('atompark');
+
+        if ($phone === null) {
+            $phone = $notifiable->routeNotificationFor(self::class);
+        }
+
+        return (string) ($phone ?? '');
     }
 }
