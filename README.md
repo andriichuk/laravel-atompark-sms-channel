@@ -126,6 +126,25 @@ The `Sms` value object supports:
 - `phone` (string, optional) – recipient phone number including country code; if omitted, the channel resolves it from the notifiable.
 - `lifetime` (int) – message lifetime in hours (`0` = maximum, `1`, `6`, `12`, `24`).
 
+### Error handling
+
+AtomPark reports failures in the response body under an HTTP `200`, so a rejected message is indistinguishable from a delivered one unless the body is inspected. The channel does that for you and throws `CouldNotSendNotification` when AtomPark returns an error, or when the body is not readable JSON:
+
+```php
+use Andriichuk\AtomParkSmsChannel\Exceptions\CouldNotSendNotification;
+
+try {
+    $user->notify(new Invitation());
+} catch (CouldNotSendNotification $exception) {
+    $exception->errorCode;    // e.g. '-443'
+    $exception->errorMessage; // e.g. 'Error sendSMS'
+}
+```
+
+Every failure is also written to the `error` log channel, with the recipient number masked to its last four digits.
+
+If your notification implements `ShouldQueue`, a failing send now fails the job, so it follows the retry and `failed_jobs` behaviour configured on that notification. Set `$tries` and `$backoff` to match how long you want the queue to keep retrying an outage.
+
 ## Testing
 
 Run the test suite with:

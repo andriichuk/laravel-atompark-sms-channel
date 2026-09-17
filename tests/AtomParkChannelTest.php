@@ -2,12 +2,24 @@
 
 use Andriichuk\AtomParkSmsChannel\AtomParkChannel;
 use Andriichuk\AtomParkSmsChannel\AtomParkClient;
+use Andriichuk\AtomParkSmsChannel\Exceptions\CouldNotSendNotification;
 use Andriichuk\AtomParkSmsChannel\Sms;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
-use Psr\Http\Message\ResponseInterface;
+
+function atomParkSuccessResponse(): Response
+{
+    return new Response(200, [], json_encode(['result' => ['id' => 1853174, 'price' => 0.13]]));
+}
+
+function atomParkResponse(array $payload): Response
+{
+    return new Response(200, [], json_encode($payload));
+}
 
 it('sends sms via AtomParkChannel for notifiable model', function () {
     $client = $this->createMock(AtomParkClient::class);
@@ -23,7 +35,7 @@ it('sends sms via AtomParkChannel for notifiable model', function () {
 
             return true;
         }))
-        ->willReturn($this->createMock(ResponseInterface::class));
+        ->willReturn(atomParkSuccessResponse());
 
     $channel = new AtomParkChannel($client);
 
@@ -69,7 +81,7 @@ it('resolves phone using full channel class name', function () {
 
             return true;
         }))
-        ->willReturn($this->createMock(ResponseInterface::class));
+        ->willReturn(atomParkSuccessResponse());
 
     $channel = new AtomParkChannel($client);
 
@@ -117,7 +129,7 @@ it('sends sms for anonymous notifiable route', function () {
 
             return true;
         }))
-        ->willReturn($this->createMock(ResponseInterface::class));
+        ->willReturn(atomParkSuccessResponse());
 
     $this->app->instance(AtomParkClient::class, $client);
 
@@ -212,3 +224,127 @@ it('throws when phone cannot be resolved from notifiable', function () {
 
     $channel->send($notifiable, $notification);
 })->throws(InvalidArgumentException::class, 'Could not determine recipient phone number for AtomPark SMS notification.');
+
+it('logs and throws when AtomPark responds with an error payload', function () {
+    Log::shouldReceive('error')
+        ->once()
+        ->withArgs(function (string $message, array $context): bool {
+            expect($message)->toBe('AtomPark SMS send failed.')
+                ->and($context)->toMatchArray([
+                    'phone' => '******6789',
+                    'code' => '-443',
+                    'error' => 'Error sendSMS',
+                ]);
+
+            return true;
+        });
+
+    $client = $this->createMock(AtomParkClient::class);
+
+    $client->expects($this->once())
+        ->method('sendSMS')
+        ->willReturn(atomParkResponse(['error' => 'Error sendSMS', 'code' => '-443', 'result' => '']));
+
+    $channel = new AtomParkChannel($client);
+
+    $notifiable = new class extends Model
+    {
+        use Notifiable;
+
+        public function routeNotificationForAtomPark(): string
+        {
+            return '+123456789';
+        }
+    };
+
+    $notification = new class extends Notification
+    {
+        public function via($notifiable): array
+        {
+            return ['atompark'];
+        }
+
+        public function toAtomPark($notifiable): Sms
+        {
+            return new Sms(text: 'Test message');
+        }
+    };
+
+    $channel->send($notifiable, $notification);
+})->throws(CouldNotSendNotification::class, 'AtomPark responded with an error [-443]: Error sendSMS');
+
+it('logs and throws when AtomPark responds with an unreadable body', function () {
+    Log::shouldReceive('error')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $context['body'] === '<html>gateway down</html>');
+
+    $client = $this->createMock(AtomParkClient::class);
+
+    $client->expects($this->once())
+        ->method('sendSMS')
+        ->willReturn(new Response(200, [], '<html>gateway down</html>'));
+
+    $channel = new AtomParkChannel($client);
+
+    $notifiable = new class extends Model
+    {
+        use Notifiable;
+
+        public function routeNotificationForAtomPark(): string
+        {
+            return '+123456789';
+        }
+    };
+
+    $notification = new class extends Notification
+    {
+        public function via($notifiable): array
+        {
+            return ['atompark'];
+        }
+
+        public function toAtomPark($notifiable): Sms
+        {
+            return new Sms(text: 'Test message');
+        }
+    };
+
+    $channel->send($notifiable, $notification);
+})->throws(CouldNotSendNotification::class, 'AtomPark returned an unreadable response [HTTP 200]');
+
+it('does not log when AtomPark accepts the message', function () {
+    Log::shouldReceive('error')->never();
+
+    $client = $this->createMock(AtomParkClient::class);
+
+    $client->expects($this->once())
+        ->method('sendSMS')
+        ->willReturn(atomParkSuccessResponse());
+
+    $channel = new AtomParkChannel($client);
+
+    $notifiable = new class extends Model
+    {
+        use Notifiable;
+
+        public function routeNotificationForAtomPark(): string
+        {
+            return '+123456789';
+        }
+    };
+
+    $notification = new class extends Notification
+    {
+        public function via($notifiable): array
+        {
+            return ['atompark'];
+        }
+
+        public function toAtomPark($notifiable): Sms
+        {
+            return new Sms(text: 'Test message');
+        }
+    };
+
+    $channel->send($notifiable, $notification);
+});
